@@ -11,6 +11,7 @@ Designed primarily for AI agents, but equally usable by humans through a CLI.
 - Daily habits with history, streaks and backfill of missed marks.
 - Telegram reminders at a fixed interval during active hours, until each item is done.
 - Done buttons in Telegram for tasks and habits.
+- Capture from the phone: send the bot `Review PRs #work !high @tomorrow`, `/habit Gym` or `/list`. Send `/help` for the syntax.
 
 ## Agent-first
 

@@ -130,22 +130,22 @@ func (r *reminder) runSchedule(ctx context.Context) {
 		case <-time.After(time.Until(next)):
 		}
 		if withinActiveHours(next, r.activeStartHour, r.activeEndHour) {
-			if err := r.send(ctx); err != nil {
+			if _, err := r.send(ctx); err != nil {
 				log.Printf("reminder: %v", err)
 			}
 		}
 	}
 }
 
-// send replaces the previous reminder, so only one message has live buttons.
-func (r *reminder) send(ctx context.Context) error {
+// send replaces the previous reminder, so only one message has live buttons. It reports false when nothing is pending.
+func (r *reminder) send(ctx context.Context) (bool, error) {
 	text, keyboard, err := r.render()
 	if err != nil {
-		return err
+		return false, err
 	}
 	previousMessageID, err := r.store.GetState(lastReminderMessageKey)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if previousMessageID != "" {
 		messageID, _ := strconv.ParseInt(previousMessageID, 10, 64)
@@ -154,27 +154,30 @@ func (r *reminder) send(ctx context.Context) error {
 			log.Printf("reminder: %v", err)
 		}
 		if err := r.store.SetState(lastReminderMessageKey, ""); err != nil {
-			return err
+			return false, err
 		}
 	}
 	if len(keyboard) == 0 {
-		return nil
+		return false, nil
 	}
 	var message telegramMessage
 	if err := r.bot.call(ctx, "sendMessage", map[string]any{
 		"chat_id": r.bot.chatID, "text": text, "reply_markup": inlineKeyboard{keyboard},
 	}, &message); err != nil {
-		return err
+		return false, err
 	}
-	return r.store.SetState(lastReminderMessageKey, strconv.FormatInt(message.MessageID, 10))
+	return true, r.store.SetState(lastReminderMessageKey, strconv.FormatInt(message.MessageID, 10))
 }
 
-func (r *reminder) pollButtonPresses(ctx context.Context) {
+func (r *reminder) pollUpdates(ctx context.Context) {
+	if err := r.bot.call(ctx, "setMyCommands", map[string]any{"commands": telegramCommandMenu}, nil); err != nil {
+		log.Printf("reminder: %v", err)
+	}
 	var nextUpdateOffset int64
 	for ctx.Err() == nil {
 		var updates []telegramUpdate
 		err := r.bot.call(ctx, "getUpdates", map[string]any{
-			"offset": nextUpdateOffset, "timeout": 50, "allowed_updates": []string{"callback_query"},
+			"offset": nextUpdateOffset, "timeout": 50, "allowed_updates": []string{"message", "callback_query"},
 		}, &updates)
 		if err != nil {
 			if ctx.Err() == nil {
@@ -187,6 +190,9 @@ func (r *reminder) pollButtonPresses(ctx context.Context) {
 			nextUpdateOffset = update.UpdateID + 1
 			if update.CallbackQuery != nil {
 				r.handleButtonPress(ctx, update.CallbackQuery)
+			}
+			if update.Message != nil && update.Message.Chat.ID == r.bot.chatID {
+				r.reply(ctx, r.handleTextMessage(ctx, update.Message.Text))
 			}
 		}
 	}

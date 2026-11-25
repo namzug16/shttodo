@@ -80,7 +80,7 @@ func runServe() error {
 	defer stop()
 	reminders := &reminder{store, newTelegramBot(botToken, chatID), intervalMinutes, activeStartHour, activeEndHour}
 	go reminders.runSchedule(ctx)
-	go reminders.pollButtonPresses(ctx)
+	go reminders.pollUpdates(ctx)
 
 	listenAddress := envOrDefault("SHTTODO_LISTEN_ADDRESS", ":8080")
 	httpServer := &http.Server{Addr: listenAddress, Handler: (&apiServer{store, apiToken}).routes(), ReadHeaderTimeout: 10 * time.Second}

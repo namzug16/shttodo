@@ -31,6 +31,7 @@ type telegramMessage struct {
 	Chat      struct {
 		ID int64 `json:"id"`
 	} `json:"chat"`
+	Text string `json:"text"`
 }
 
 type telegramCallbackQuery struct {
@@ -41,6 +42,7 @@ type telegramCallbackQuery struct {
 
 type telegramUpdate struct {
 	UpdateID      int64                  `json:"update_id"`
+	Message       *telegramMessage       `json:"message"`
 	CallbackQuery *telegramCallbackQuery `json:"callback_query"`
 }
 

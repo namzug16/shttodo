@@ -109,3 +109,5 @@ Every error exits with code 1. In JSON mode:
 ## Telegram
 
 The user gets a reminder each interval during active hours. It shows the habits not yet done today, then the pending tasks by group, with a done button for each item. You do not need to send reminders.
+
+The user also adds tasks and habits from the phone through the bot, so tasks can appear that you did not create. Phone captures are often short: when you work on such a task, offer to add a group, priority, due date or notes.
