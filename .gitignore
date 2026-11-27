@@ -1,3 +1,4 @@
 /shttodo
 *.db
 *.db-*
+.env

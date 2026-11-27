@@ -22,11 +22,7 @@ The container publishes its port on `127.0.0.1` only, and Coolify gives it no do
 
 ## 1. Prepare the secrets
 
-1. Make the API token: `openssl rand -hex 32`.
-2. In Telegram, talk to `@BotFather`, send `/newbot` and copy the bot token.
-3. Send any message to your new bot. Then open `https://api.telegram.org/bot<bot-token>/getUpdates` and copy `message.chat.id`. This is `TELEGRAM_CHAT_ID`.
-
-Keep these values in a password manager. Do not commit them.
+Get `SHTTODO_API_TOKEN`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Refer to [Get the tokens](../README.md#get-the-tokens).
 
 ## 2. Install Tailscale on the VPS
 
