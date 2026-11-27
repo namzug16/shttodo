@@ -91,6 +91,8 @@ To use the bot in a group, add the bot to the group and send a message in the gr
 
 ## Configuration
 
+Copy [`.env.example`](.env.example) to `.env` and set the values. Docker Compose reads `.env` automatically.
+
 CLI:
 
 | Variable | Meaning |
