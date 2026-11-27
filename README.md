@@ -7,6 +7,7 @@ Designed primarily for AI agents, but equally usable by humans through a CLI.
 ## Features
 
 - Tasks with a title, group, priority (`low`, `normal`, `high`), due date and notes.
+- Priority rises as the due date gets close: `high` 7 days before, at least `normal` 30 days before.
 - Groups for projects, companies or personal activities. `master` is the permanent default group.
 - Daily habits with history, streaks and backfill of missed marks.
 - Telegram reminders at a fixed interval during active hours, until each item is done.

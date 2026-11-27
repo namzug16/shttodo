@@ -40,7 +40,8 @@ shttodo delete <id>                  # permanent
 - `--notes` replaces all notes. To add to notes, read them first and write the full new text.
 - Move a task to another group with `edit <id> --group <name>`.
 - The default group is `master`. The default priority is `normal`.
-- `list` order: group name, then priority (high first), then due date (no due date last), then ID.
+- Pending tasks rise in priority as the due date gets close: `high` from 7 days before (and when overdue), at least `normal` from 30 days before. Output shows this effective priority, not the stored one.
+- `list` order: group name, then effective priority (high first), then due date (no due date last), then ID.
 
 Task JSON:
 

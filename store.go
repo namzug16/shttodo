@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +21,12 @@ const (
 var (
 	groupNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 	validPriorities  = map[string]bool{"low": true, "normal": true, "high": true}
+	priorityRank     = map[string]int{"high": 0, "normal": 1, "low": 2}
+)
+
+const (
+	daysBeforeDueToEscalateToHigh   = 7
+	daysBeforeDueToEscalateToNormal = 30
 )
 
 // apiError is the single error type shared by the store, the REST API and the CLI.
@@ -196,7 +203,30 @@ const taskColumns = `id, title, group_name, priority, due, notes, status, create
 func scanTask(row interface{ Scan(...any) error }) (Task, error) {
 	var task Task
 	err := row.Scan(&task.ID, &task.Title, &task.Group, &task.Priority, &task.Due, &task.Notes, &task.Status, &task.CreatedAt, &task.CompletedAt)
+	if err == nil && task.Status == "pending" {
+		task.Priority = escalatedPriority(task.Priority, task.Due, todayDate())
+	}
 	return task, err
+}
+
+// escalatedPriority raises the priority as the due date gets close. Overdue tasks are high.
+func escalatedPriority(priority, due, today string) string {
+	if due == "" {
+		return priority
+	}
+	dueTime, dueErr := time.Parse(dateLayout, due)
+	todayTime, todayErr := time.Parse(dateLayout, today)
+	if dueErr != nil || todayErr != nil {
+		return priority
+	}
+	daysUntilDue := int(dueTime.Sub(todayTime).Hours() / 24)
+	if daysUntilDue <= daysBeforeDueToEscalateToHigh {
+		return "high"
+	}
+	if daysUntilDue <= daysBeforeDueToEscalateToNormal && priority == "low" {
+		return "normal"
+	}
+	return priority
 }
 
 func (s *Store) GetTask(id int64) (Task, error) {
@@ -212,7 +242,8 @@ func (s *Store) ListTasks(groupName string, includeDone bool) ([]Task, error) {
 	if !includeDone {
 		query += ` AND status = 'pending'`
 	}
-	query += ` ORDER BY group_name, CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, due = '', due, id`
+	// Priority order is applied after the scan because it depends on the escalated priority.
+	query += ` ORDER BY group_name, due = '', due, id`
 	if groupName != "" {
 		exists, err := s.groupExists(groupName)
 		if err != nil {
@@ -235,6 +266,12 @@ func (s *Store) ListTasks(groupName string, includeDone bool) ([]Task, error) {
 		}
 		tasks = append(tasks, task)
 	}
+	sort.SliceStable(tasks, func(left, right int) bool {
+		if tasks[left].Group != tasks[right].Group {
+			return tasks[left].Group < tasks[right].Group
+		}
+		return priorityRank[tasks[left].Priority] < priorityRank[tasks[right].Priority]
+	})
 	return tasks, rows.Err()
 }
 

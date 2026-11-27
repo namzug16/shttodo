@@ -58,10 +58,10 @@ func TestListTasksOrder(t *testing.T) {
 		}
 	}
 	create("no due", "master", "normal", "")
-	create("later", "master", "normal", "2026-12-01")
-	create("sooner", "master", "normal", "2026-11-01")
+	create("later", "master", "normal", "2099-12-01")
+	create("sooner", "master", "normal", "2099-11-01")
 	create("high", "master", "high", "")
-	create("low", "master", "low", "2026-01-01")
+	create("low", "master", "low", "2099-01-01")
 	create("work", "work", "normal", "")
 
 	tasks, err := store.ListTasks("", false)
@@ -79,6 +79,25 @@ func TestListTasksOrder(t *testing.T) {
 	for index := range want {
 		if titles[index] != want[index] {
 			t.Fatalf("got %v, want %v", titles, want)
+		}
+	}
+}
+
+func TestEscalatedPriority(t *testing.T) {
+	cases := []struct{ priority, due, want string }{
+		{"low", "", "low"},
+		{"low", "2026-03-10", "high"},
+		{"low", "2026-03-01", "high"},
+		{"low", "2026-03-17", "high"},
+		{"low", "2026-03-18", "normal"},
+		{"low", "2026-04-09", "normal"},
+		{"low", "2026-04-10", "low"},
+		{"normal", "2026-04-09", "normal"},
+		{"high", "2026-12-01", "high"},
+	}
+	for _, testCase := range cases {
+		if got := escalatedPriority(testCase.priority, testCase.due, "2026-03-10"); got != testCase.want {
+			t.Errorf("escalatedPriority(%q, %q) = %q, want %q", testCase.priority, testCase.due, got, testCase.want)
 		}
 	}
 }
