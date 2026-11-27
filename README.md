@@ -1,25 +1,26 @@
 # shttodo
 
-A stupidly simple, self-hosted, agent-first task manager with persistent Telegram reminders.
+shttodo is a simple task manager. You host it on your own server. It sends Telegram reminders until you complete each task.
 
-Designed primarily for AI agents, but equally usable by humans through a CLI.
+AI agents are the primary users. People can also use it through the CLI.
 
 ## Features
 
-- Tasks with a title, group, priority (`low`, `normal`, `high`), due date and notes.
-- Groups for projects, companies or personal activities. `master` is the permanent default group.
-- Daily habits with history, streaks and backfill of missed marks.
-- Telegram reminders at a fixed interval during active hours, until each item is done.
-- Done buttons in Telegram for tasks and habits.
-- Capture from the phone: send the bot `Review PRs #work !high @tomorrow`, `/habit Gym` or `/list`. Send `/help` for the syntax.
+- Each task has a title, a group, a priority (`low`, `normal`, `high`), a due date and notes.
+- The priority increases near the due date. It is `high` 7 days before the due date. It is minimum `normal` 30 days before the due date.
+- Groups keep tasks for projects, companies or personal work apart. `master` is the default group. You cannot delete it.
+- Daily habits have a history and streaks. You can mark the days that you missed.
+- During the active hours, Telegram sends reminders at a fixed interval until you complete each item.
+- Each Telegram reminder has a "Done" button for tasks and habits.
+- You can add items from your phone. Send the bot `Review PRs #work !high @tomorrow`, `/habit Gym` or `/list`. Send `/help` to see the syntax.
 
 ## Agent-first
 
-- `shttodo` prints usage and points agents to `shttodo skill`.
-- `shttodo skill` prints the full agent skill, embedded in the binary from [`SKILL.md`](SKILL.md).
-- Every command accepts `--json`. Errors have stable codes and exit with code 1.
-- Commands that change data return the full object, so no follow-up request is needed.
-- No MCP server. The CLI is the integration.
+- `shttodo` shows the usage and tells agents to use `shttodo skill`.
+- `shttodo skill` shows the full agent skill. The binary contains it from [`SKILL.md`](SKILL.md).
+- All commands accept `--json`. Errors have fixed codes. When an error occurs, the exit code is 1.
+- Commands that change data return the full object. Thus, the agent does not need a second request.
+- There is no MCP server. The CLI is the integration.
 
 ## CLI
 
@@ -44,31 +45,75 @@ shttodo habit undo 3
 shttodo habit show 3 [--since 2026-01-01]
 ```
 
+## Get the tokens
+
+The server needs three values: `SHTTODO_API_TOKEN`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+
+### Make the API token
+
+1. Run this command:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. Copy the output. This is `SHTTODO_API_TOKEN`. The server and the CLI use the same value.
+
+### Make the Telegram bot
+
+1. In Telegram, open a chat with [`@BotFather`](https://t.me/BotFather).
+2. Send `/newbot`.
+3. Type a display name for the bot, for example `My Tasks`.
+4. Type a username for the bot. The username must end with `bot`, for example `my_tasks_bot`.
+5. Copy the token that `@BotFather` sends. This is `TELEGRAM_BOT_TOKEN`. It looks like `123456789:AAH...`.
+
+### Get the chat ID
+
+1. Open a chat with your new bot. Push **Start**, or send a message, for example `hello`.
+2. Make sure that shttodo is not in operation. When shttodo is in operation, it reads the messages first, and the next step shows no messages.
+3. Open this URL in a browser. Replace `<bot-token>` with your bot token:
+
+   ```
+   https://api.telegram.org/bot<bot-token>/getUpdates
+   ```
+
+4. Find `"chat":{"id":...}` in the response. Copy the number. This is `TELEGRAM_CHAT_ID`.
+
+If the `result` list is empty, send a new message to the bot. Then open the URL again.
+
+To use the bot in a group, add the bot to the group and send a message in the group. A group chat ID starts with `-`.
+
+### Keep the tokens safe
+
+- Keep the tokens in a password manager.
+- Do not commit the tokens to Git.
+- If a person gets your bot token, send `/revoke` to `@BotFather`. Then use the new token.
+
 ## Configuration
 
 CLI:
 
 | Variable | Meaning |
 |---|---|
-| `SHTTODO_SERVER_URL` | backend URL |
-| `SHTTODO_API_TOKEN` | API token |
+| `SHTTODO_SERVER_URL` | the URL of the server |
+| `SHTTODO_API_TOKEN` | the API token |
 
 Server (`shttodo serve`):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SHTTODO_API_TOKEN` | required | API token |
-| `TELEGRAM_BOT_TOKEN` | required | bot token from `@BotFather` |
-| `TELEGRAM_CHAT_ID` | required | the only chat the bot talks to |
-| `REMINDER_INTERVAL_MINUTES` | `60` | must divide 1440 |
-| `REMINDER_ACTIVE_HOURS` | `09-21` | inclusive, `22-06` wraps past midnight |
-| `TZ` | system | IANA timezone for reminders, due dates and habit days |
-| `SHTTODO_DATABASE_PATH` | `shttodo.db` | SQLite file (`/data/shttodo.db` in Docker) |
-| `SHTTODO_LISTEN_ADDRESS` | `:8080` | HTTP listen address |
+| `SHTTODO_API_TOKEN` | required | the API token |
+| `TELEGRAM_BOT_TOKEN` | required | the bot token from `@BotFather` |
+| `TELEGRAM_CHAT_ID` | required | the only chat that the bot uses |
+| `REMINDER_INTERVAL_MINUTES` | `60` | 1440 divided by this value must give a whole number |
+| `REMINDER_ACTIVE_HOURS` | `09-21` | includes the two hours. `22-06` continues after midnight |
+| `TZ` | system | the IANA timezone for reminders, due dates and habit days |
+| `SHTTODO_DATABASE_PATH` | `shttodo.db` | the SQLite file (`/data/shttodo.db` in Docker) |
+| `SHTTODO_LISTEN_ADDRESS` | `:8080` | the HTTP listen address |
 
 ## Deployment
 
-Docker Compose on a VPS, private through Tailscale. See [docs/deploy-coolify-tailscale.md](docs/deploy-coolify-tailscale.md).
+Use Docker Compose on a VPS. Tailscale keeps the server private. Refer to [docs/deploy-coolify-tailscale.md](docs/deploy-coolify-tailscale.md).
 
 ## Development
 
@@ -79,14 +124,14 @@ go build .
 
 ## Architecture
 
-- One Go binary for the CLI and the backend. Standard library plus `modernc.org/sqlite` (pure Go, no cgo).
-- SQLite, REST API with a Bearer token, Telegram Bot API with long polling, built-in scheduler.
+- One Go binary contains the CLI and the server. It uses the standard library and `modernc.org/sqlite` (pure Go, no cgo).
+- The server uses SQLite, a REST API with a Bearer token, the Telegram Bot API with long polling and a built-in scheduler.
 
 ## Principles
 
-- Agent-first, human-friendly.
-- Self-hosted, single-user, self-documenting.
-- Minimal dependencies and minimal token consumption.
-- No web dashboard, no embedded AI models, no paid services.
+- Agents are the primary users. People can also use it easily.
+- You host it yourself. It has one user. It shows its own documentation.
+- It has few dependencies and uses few tokens.
+- It has no web dashboard, no AI models in the binary and no paid services.
 
 **Get shit done.**
