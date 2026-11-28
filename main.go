@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"slices"
 	"strconv"
@@ -71,6 +72,11 @@ func runServe() error {
 	if err != nil {
 		return errValidationFailed("%v", err)
 	}
+	agentCommand := os.Getenv("REMINDER_AGENT_COMMAND")
+	if _, err := exec.LookPath("sh"); agentCommand != "" && err != nil {
+		return errValidationFailed("REMINDER_AGENT_COMMAND needs sh, but sh is not on PATH: %v", err)
+	}
+	agentPrompt := envOrDefault("REMINDER_AGENT_PROMPT", defaultAgentPrompt)
 	store, err := openStore(envOrDefault("SHTTODO_DATABASE_PATH", "shttodo.db"))
 	if err != nil {
 		return err
@@ -78,7 +84,7 @@ func runServe() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	reminders := &reminder{store, newTelegramBot(botToken, chatID), intervalMinutes, activeStartHour, activeEndHour}
+	reminders := &reminder{store, newTelegramBot(botToken, chatID), intervalMinutes, activeStartHour, activeEndHour, agentCommand, agentPrompt}
 	go reminders.runSchedule(ctx)
 	go reminders.pollUpdates(ctx)
 
@@ -90,6 +96,9 @@ func runServe() error {
 		defer cancel()
 		httpServer.Shutdown(shutdownCtx)
 	}()
+	if agentCommand != "" {
+		log.Printf("reminder text comes from REMINDER_AGENT_COMMAND")
+	}
 	log.Printf("shttodo listening on %s, reminders every %d minutes during %02d-%02d %s",
 		listenAddress, intervalMinutes, activeStartHour, activeEndHour, time.Local)
 	if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

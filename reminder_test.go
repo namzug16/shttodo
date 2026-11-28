@@ -77,3 +77,16 @@ func TestBuildReminderLimits(t *testing.T) {
 		t.Fatalf("missing overflow line: %q", text[len(text)-20:])
 	}
 }
+
+func TestRunAgent(t *testing.T) {
+	output, err := runAgent(t.Context(), "tr a-z A-Z", "pending items")
+	if err != nil || output != "PENDING ITEMS" {
+		t.Errorf("runAgent = %q, %v", output, err)
+	}
+	if _, err := runAgent(t.Context(), "echo boom >&2; exit 3", ""); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("failing command error = %v", err)
+	}
+	if _, err := runAgent(t.Context(), "true", ""); err == nil {
+		t.Error("empty output must fail")
+	}
+}

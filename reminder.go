@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +17,9 @@ const (
 	lastReminderMessageKey  = "last_reminder_message_id"
 	reminderTitleLimitRunes = 100
 	buttonTextLimitRunes    = 40
+	agentTimeout            = 3 * time.Minute
+	agentOutputLimitRunes   = 4000
+	defaultAgentPrompt      = "Write a short Telegram reminder for the pending items below. Be direct and a bit motivating. Mention overdue and high priority items first. Plain text only, no Markdown. Do not invent items."
 )
 
 type reminder struct {
@@ -23,6 +28,8 @@ type reminder struct {
 	intervalMinutes int
 	activeStartHour int
 	activeEndHour   int
+	agentCommand    string // empty means the reminder text is the plain list.
+	agentPrompt     string
 }
 
 // parseActiveHours reads "HH-HH". Both hours are inclusive; start > end wraps past midnight.
@@ -108,6 +115,24 @@ func buildReminder(habits []Habit, tasks []Task, today string) (string, [][]inli
 	return strings.TrimSpace(text.String()), keyboard
 }
 
+// runAgent runs command with sh -c, writes input to its stdin and returns its stdout.
+func runAgent(ctx context.Context, command, input string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, agentTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd.Stdin = strings.NewReader(input)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("agent command: %v: %s", err, truncateRunes(strings.TrimSpace(stderr.String()), 500))
+	}
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
+		return "", fmt.Errorf("agent command: empty output")
+	}
+	return truncateRunes(output, agentOutputLimitRunes), nil
+}
+
 func (r *reminder) render() (string, [][]inlineButton, error) {
 	habits, err := r.store.ListHabits()
 	if err != nil {
@@ -130,7 +155,7 @@ func (r *reminder) runSchedule(ctx context.Context) {
 		case <-time.After(time.Until(next)):
 		}
 		if withinActiveHours(next, r.activeStartHour, r.activeEndHour) {
-			if _, err := r.send(ctx); err != nil {
+			if _, err := r.send(ctx, true); err != nil {
 				log.Printf("reminder: %v", err)
 			}
 		}
@@ -138,10 +163,19 @@ func (r *reminder) runSchedule(ctx context.Context) {
 }
 
 // send replaces the previous reminder, so only one message has live buttons. It reports false when nothing is pending.
-func (r *reminder) send(ctx context.Context) (bool, error) {
+// With writeWithAgent, the agent command writes the text; the plain list is the fallback when it fails.
+func (r *reminder) send(ctx context.Context, writeWithAgent bool) (bool, error) {
 	text, keyboard, err := r.render()
 	if err != nil {
 		return false, err
+	}
+	if writeWithAgent && r.agentCommand != "" && len(keyboard) > 0 {
+		input := fmt.Sprintf("%s\n\nNow: %s\n\nPending items:\n%s", r.agentPrompt, time.Now().Format("Monday 2006-01-02 15:04"), text)
+		if agentText, err := runAgent(ctx, r.agentCommand, input); err != nil {
+			log.Printf("reminder: %v", err)
+		} else {
+			text = agentText
+		}
 	}
 	previousMessageID, err := r.store.GetState(lastReminderMessageKey)
 	if err != nil {
