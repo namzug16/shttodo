@@ -12,6 +12,7 @@ AI agents are the primary users. People can also use it through the CLI.
 - Daily habits have a history and streaks. You can mark the days that you missed.
 - During the active hours, Telegram sends reminders at a fixed interval until you complete each item.
 - Each Telegram reminder has a "Done" button for tasks and habits.
+- An agent CLI, for example Codex, can write the reminder text. It can also add tasks from your own words: "deliver the report in three days". Refer to [docs/reminder-agent.md](docs/reminder-agent.md).
 - You can add items from your phone. Send the bot `Review PRs #work !high @tomorrow`, `/habit Gym` or `/list`. Send `/help` to see the syntax.
 
 ## Agent-first
@@ -115,6 +116,8 @@ Server (`shttodo serve`):
 | `TELEGRAM_CHAT_ID` | required | the only chat that the bot uses |
 | `REMINDER_INTERVAL_MINUTES` | `60` | 1440 divided by this value must give a whole number |
 | `REMINDER_ACTIVE_HOURS` | `09-21` | includes the two hours. `22-06` continues after midnight |
+| `REMINDER_AGENT_COMMAND` | empty | a shell command that writes the reminder text and reads the messages to the bot. Refer to [docs/reminder-agent.md](docs/reminder-agent.md) |
+| `REMINDER_AGENT_PROMPT` | built-in | the instructions for the agent |
 | `TZ` | system | the IANA timezone for reminders, due dates and habit days |
 | `SHTTODO_DATABASE_PATH` | `shttodo.db` | the SQLite file (`/data/shttodo.db` in Docker) |
 | `SHTTODO_LISTEN_ADDRESS` | `:8080` | the HTTP listen address |
@@ -140,6 +143,6 @@ go build .
 - Agents are the primary users. People can also use it easily.
 - You host it yourself. It has one user. It shows its own documentation.
 - It has few dependencies and uses few tokens.
-- It has no web dashboard, no AI models in the binary and no paid services.
+- It has no web dashboard, no AI models in the binary and no paid services. An agent CLI is optional.
 
 **Get shit done.**
