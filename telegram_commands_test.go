@@ -70,3 +70,17 @@ func TestHandleTextMessage(t *testing.T) {
 		t.Errorf("habit notes: got %q", habit.Notes)
 	}
 }
+
+func TestHandleTextMessageWithAgent(t *testing.T) {
+	r := &reminder{store: newTestStore(t), agentCommand: `grep -q "deliver x in three days" && echo "Deliver X @2027-06-01"`}
+	if got, want := r.handleTextMessage(t.Context(), "i have to deliver x in three days"), "Added #1 Deliver X (master, due 2027-06-01)"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, want := r.handleTextMessage(t.Context(), "/add Exact title"), "Added #2 Exact title (master)"; got != want {
+		t.Errorf("/add must skip the agent: got %q, want %q", got, want)
+	}
+	r.agentCommand = "exit 1"
+	if got := r.handleTextMessage(t.Context(), "anything"); !strings.HasPrefix(got, "Error: agent command") {
+		t.Errorf("failing agent: got %q", got)
+	}
+}

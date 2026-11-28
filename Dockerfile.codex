@@ -1,0 +1,18 @@
+# The default image is distroless: it has no shell and no Node.js, so it cannot run an agent.
+# This image adds sh and the Codex CLI. Refer to docs/reminder-agent.md.
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY *.go SKILL.md ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /shttodo .
+
+FROM node:22-slim
+ARG CODEX_VERSION=latest
+RUN npm install -g @openai/codex@${CODEX_VERSION} && npm cache clean --force
+COPY --from=build /shttodo /usr/local/bin/shttodo
+ENV SHTTODO_DATABASE_PATH=/data/shttodo.db
+VOLUME /data
+EXPOSE 8080
+ENTRYPOINT ["shttodo"]
+CMD ["serve"]

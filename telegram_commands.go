@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-const telegramHelpText = `Send a message to add a task. Markers go at the end of the first line:
+const telegramHelpText = `Send a message to add a task. With an agent, write it freely: "deliver the report in 3 days".
+Without an agent, or with /add, markers go at the end of the first line:
   #group  !high or !low  @today @tomorrow @mon..@sun @YYYY-MM-DD
 More lines become notes.
 
@@ -53,6 +54,15 @@ func (r *reminder) handleTextMessage(ctx context.Context, text string) string {
 		command, _, _ = strings.Cut(command, "@")
 	}
 
+	if !strings.HasPrefix(text, "/") && r.agentCommand != "" {
+		// shortcut: updates wait while the agent runs; move it to a goroutine if that gets annoying.
+		line, err := runAgent(ctx, r.agentCommand, r.taskParsingPrompt(text))
+		if err != nil {
+			return "Error: " + err.Error() + "\nUse /add to skip the agent."
+		}
+		arguments = line
+	}
+
 	switch command {
 	case "/add":
 		fields, err := parseTaskMessage(arguments, time.Now())
@@ -84,7 +94,7 @@ func (r *reminder) handleTextMessage(ctx context.Context, text string) string {
 		}
 		return fmt.Sprintf("Added habit #%d %s", habit.ID, habit.Title)
 	case "/list":
-		sent, err := r.send(ctx)
+		sent, err := r.send(ctx, false)
 		if err != nil {
 			return "Error: " + err.Error()
 		}
@@ -96,6 +106,21 @@ func (r *reminder) handleTextMessage(ctx context.Context, text string) string {
 		return telegramHelpText
 	}
 	return "Unknown command " + command + ". Send /help."
+}
+
+// taskParsingPrompt asks the agent to turn free text into the marker syntax, so parseTaskMessage still validates it.
+func (r *reminder) taskParsingPrompt(message string) string {
+	return fmt.Sprintf(`Convert the message below into one task line in this syntax:
+title [#group] [!high|!low] [@YYYY-MM-DD]
+The markers go at the end. Use only these groups: %s. Leave out #group if none fits.
+Use @YYYY-MM-DD for a deadline, computed from today. Use !high only if the message says it is urgent or important.
+Write the title in the language of the message. Extra details go on the next lines as notes.
+Output only the task, no quotes, no Markdown.
+
+Today: %s
+
+Message:
+%s`, r.groupNames(), time.Now().Format("Monday 2006-01-02"), message)
 }
 
 func (r *reminder) groupNames() string {
