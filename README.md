@@ -51,13 +51,19 @@ The server needs three values: `SHTTODO_API_TOKEN`, `TELEGRAM_BOT_TOKEN` and `TE
 
 ### Make the API token
 
-1. Run this command:
+You make this token yourself. The server does not make it, and the CLI does not make it. It is a shared password between the server and the CLI.
+
+1. Run this command on any computer:
 
    ```bash
    openssl rand -hex 32
    ```
 
-2. Copy the output. This is `SHTTODO_API_TOKEN`. The server and the CLI use the same value.
+2. Copy the output. This is `SHTTODO_API_TOKEN`.
+3. On the server, set `SHTTODO_API_TOKEN` to this value.
+4. On the computer with the CLI, set `SHTTODO_API_TOKEN` to the same value.
+
+The CLI sends the token with each request. If the two values are different, the server refuses the request.
 
 ### Make the Telegram bot
 
